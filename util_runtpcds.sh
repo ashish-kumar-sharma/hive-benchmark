@@ -6,22 +6,28 @@ function timedate() {
 
 ID=`TZ="America/Los_Angeles" date +"%m.%d.%Y-%H.%M.%S"`
 
-if [[ "$#" -ne 2 ]]; then
+if [[ "$#" -ne 3 ]]; then
     echo "Incorrect number of arguments."
     echo "Usage is as follows:"
-    echo "sh util_runtpcds.sh SCALE FORMAT"
+    echo "sh util_runtpcds.sh SCALE FORMAT PARALLELISM "
     exit 1
 fi
 
-if [[ "$1" =~ ^[0-9]+$ && "$1" -gt "1" ]]; then
-    if [[ "$2" == "orc" || "$2" == "parquet" ]]; then
-        echo "File format ok"
-    else
-        echo "Invalid. Supported formats are:"
-        echo "orc"
-        echo "parquet"
-        exit 1
-    fi
+if [[ "$1" -le 1 && "$1" -gt 100000 ]]; then
+    echo "Invalid. Supported scale are: 2 to 100000"
+    exit 1
+elif [[ "$2" != "orc" && "$2" != "parquet" && "$2" != "txt" && "$2" != "external" ]]; then
+    echo "Invalid. Supported formats are: orc|parquet|text|external"
+    exit 1
+elif [[ "$3" -ne 0 && "$3" -ne 1 ]]; then
+    echo "Invalid. Supported formats 0 - disable PARALLELISM and 1 - enable PARALLELISM"
+    exit 1
+else
+    # scale ~GB
+    SCALE="$1"
+    PARALLELISM="$3"
+    FORMAT="$2"
+fi
 
     # query file name
     QUERY_BASE_NAME="tpcds_queries/tpcds_query"
@@ -29,16 +35,20 @@ if [[ "$1" =~ ^[0-9]+$ && "$1" -gt "1" ]]; then
     # settings file location
     SETTINGS_PATH="settings.hql"
 
-    # scale ~GB
-    SCALE="$1"
     # report name
     REPORT_NAME="time_elapsed_tpcds"
     # database name
-    if [[ "$2" == "orc" ]]; then
+    if [[ $FORMAT == "orc" ]]; then
         DATABASE="tpcds_orc_"$SCALE
-    else
+    elif [[ $FORMAT == "parquet" ]]; then
         DATABASE="tpcds_parquet_"$SCALE
+    elif [[ $FORMAT == "text" ]]; then
+        DATABASE="tpcds_text_"$SCALE
+    else
+        DATABASE="tpcds_"$SCALE
     fi
+
+    echo "databsae - $DATABASE"
     # hostname
     HOSTNAME=`hostname -f`
     # Clock file
@@ -84,8 +94,11 @@ if [[ "$1" =~ ^[0-9]+$ && "$1" -gt "1" ]]; then
         LOG_PATH="log_query/logquery$i.txt"
 
         if [[ -f $query_path ]]; then
-            ./util_internalRunQuery.sh "$DATABASE" "$CURR_DIR$SETTINGS_PATH" "$CURR_DIR$query_path" "$CURR_DIR$LOG_PATH" "$i" "$CURR_DIR$REPORT_NAME.csv"
-
+                if [ "$PARALLELISM" -eq 1 ]; then
+                        nohup ./util_internalRunQuery.sh "$DATABASE" "$CURR_DIR$SETTINGS_PATH" "$CURR_DIR$query_path" "$CURR_DIR$LOG_PATH" "$i" "$CURR_DIR$REPORT_NAME.csv" &
+                else
+                        ./util_internalRunQuery.sh "$DATABASE" "$CURR_DIR$SETTINGS_PATH" "$CURR_DIR$query_path" "$CURR_DIR$LOG_PATH" "$i" "$CURR_DIR$REPORT_NAME.csv"
+                fi
             # See util_internalGetPAT
             # ./util_internalGetPAT.sh /$CURR_DIR/util_internalRunQuery.sh "$DATABASE" "$CURR_DIR$SETTINGS_PATH" "$CURR_DIR$query_path" "$CURR_DIR$LOG_PATH" "$i" "$CURR_DIR$REPORT_NAME.csv" tpcdsPAT"$ID"/query"$i"/
         else
@@ -104,6 +117,3 @@ if [[ "$1" =~ ^[0-9]+$ && "$1" -gt "1" ]]; then
     zip -j log_query.zip log_query/*
     zip -r "tpcds-"$SCALE"GB-"$ID".zip" log_query.zip PAT/PAT-collecting-data/results/tpcdsPAT"$ID"/* $REPORT_NAME$ID".csv" "llapio_summary"*".csv" "time_precise_tpcds"*".csv"
     rm log_query.zip
-else
-    echo "Scale must be greater than 1."
-fi
