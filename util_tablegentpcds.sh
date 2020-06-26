@@ -9,7 +9,7 @@ if [[ "$#" -ne 2 ]]; then
     echo "Usage is as follows:"
     echo "sh util_tablgentpcds.sh SCALE FORMAT"
     exit 1
-elif [[ "$1" -le 1 && "$1" -gt 100000 ]]; then
+elif [[ "$1" -lt 1 && "$1" -gt 100000 ]]; then
     echo "Invalid. Supported scale are: 2 to 100000"
     exit 1
 elif [[ "$2" != "orc" && "$2" != "parquet" && "$2" != "txt" && "$2" != "external" ]]; then
