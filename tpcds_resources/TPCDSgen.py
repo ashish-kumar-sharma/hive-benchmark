@@ -19,7 +19,6 @@ import re
 
 HDFS_CMD = "hdfs dfs"
 
-MAX_BACKOFF_UNIT = 60
 MIN_BACKOFF_UNIT = 1
 
 _logger = logging.getLogger(__name__)
@@ -44,7 +43,7 @@ def copy_table_to_hdfs(hdfs_output, table_name, data_file):
     execute("%s -copyFromLocal -f %s %s/%s/" % (HDFS_CMD, data_file, hdfs_output, table_name))
     _logger.info("copy_table_to_hdfs complete for table_name: {}".format(table_name))
 
-def execute(cmd,retries_remaining=10):
+def execute(cmd,retries_remaining=2):
     if(retries_remaining<0):
         _logger.info("All retries for {} exhauseted. Failing the attempt".format(cmd))
         sys.exit(1)
@@ -52,7 +51,7 @@ def execute(cmd,retries_remaining=10):
     try:
         subprocess.check_call(cmd,stdin=subprocess.PIPE,stderr=subprocess.STDOUT,shell=True)
     except:
-        backoff_time = (11-retries_remaining)*random.randint((11-retries_remaining)*MIN_BACKOFF_UNIT,MAX_BACKOFF_UNIT)
+        backoff_time = MIN_BACKOFF_UNIT
         _logger.info("command {} failed. Retries remaining {}. Sleeping for {} before trying again".format(cmd, retries_remaining, backoff_time))
         time.sleep(backoff_time)
         execute(cmd,retries_remaining-1)
