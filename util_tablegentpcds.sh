@@ -4,7 +4,7 @@ function timedate() {
     TZ="America/Los_Angeles" date
 }
 
-if [[ "$#" -ne 2 ]]; then
+if [[ "$#" -ne 3 ]]; then
     echo "Incorrect number of arguments."
     echo "Usage is as follows:"
     echo "sh util_tablgentpcds.sh SCALE FORMAT"
@@ -19,6 +19,7 @@ else
     # scale ~GB
     INPUT_SCALE="$1"
     FORMAT="$2"
+    GEN="$3"
 fi
 
 
@@ -32,14 +33,17 @@ fi
     timedate >> $TABLE_GENERATE_LOG
     echo "" >> $TABLE_GENERATE_LOG
 
-    # data generation
-    echo "Start data generation" >> $TABLE_GENERATE_LOG
-    timedate >> $TABLE_GENERATE_LOG
-    hdfs dfs -copyFromLocal tpcds_resources /tmp
-    beeline -u "jdbc:hive2://`hostname -f`:10001/;transportMode=http" -i settingsData.hql -f TPCDSDataGen.hql --hiveconf SCALE=$INPUT_SCALE --hiveconf PARTS=$INPUT_SCALE --hiveconf LOCATION=/HiveTPCDS_$INPUT_SCALE/ --hiveconf TPCDSBIN=`grep -A 1 "fs.defaultFS" /etc/hadoop/conf/core-site.xml | tail -1 | sed -e 's/.*<value>\(.*\)<\/value>.*/\1/'`/tmp/tpcds_resources
-    echo "End" >> $TABLE_GENERATE_LOG
-    timedate >> $TABLE_GENERATE_LOG
-    echo "" >> $TABLE_GENERATE_LOG
+if [[ "$GEN" -eq 1 ]]; then
+      # data generation
+      echo "Start data generation" >> $TABLE_GENERATE_LOG
+      timedate >> $TABLE_GENERATE_LOG
+      hdfs dfs -copyFromLocal tpcds_resources /tmp
+      beeline -u "jdbc:hive2://`hostname -f`:10001/;transportMode=http" -i settingsData.hql -f TPCDSDataGen.hql --hiveconf SCALE=$INPUT_SCALE --hiveconf PARTS=$INPUT_SCALE --hiveconf LOCATION=/HiveTPCDS_$INPUT_SCALE/ --hiveconf TPCDSBIN=`grep -A 1 "fs.defaultFS" /etc/hadoop/conf/core-site.xml | tail -1 | sed -e 's/.*<value>\(.*\)<\/value>.*/\1/'`/tmp/tpcds_resources
+      echo "End" >> $TABLE_GENERATE_LOG
+      timedate >> $TABLE_GENERATE_LOG
+      echo "" >> $TABLE_GENERATE_LOG
+fi
+
 
     MAX_REDUCERS=2600 # ~7 years of data hortonworks
     REDUCERS=$((test ${INPUT_SCALE} -gt ${MAX_REDUCERS} && echo ${MAX_REDUCERS}) || echo ${INPUT_SCALE})
